@@ -10,74 +10,41 @@
 //!
 //! A type the layout does not know is refused when it is bound, not when a
 //! Stream arrives (ADR-0042), and an issue names the dotted path where the
-//! document departed.
+//! document departed. The seven types and the required key are the
+//! capability's, shared with the YAML layout (ADR-0044); what is TOML's is
+//! whether a TOML value is of a kind, and what TOML calls a value.
 
+pub use contract::layout::{Kind, Required};
 use contract::{ContractError, ValidationIssue};
 use toml::{Table, Value};
 
-/// The seven types a layout may ask for.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    String,
-    Integer,
-    Float,
-    Boolean,
-    Table,
-    Array,
-    Datetime,
+/// Whether `value` is of `kind`.
+#[must_use]
+pub const fn holds(kind: Kind, value: &Value) -> bool {
+    matches!(
+        (kind, value),
+        (Kind::String, Value::String(_))
+            | (Kind::Integer, Value::Integer(_))
+            | (Kind::Float, Value::Float(_))
+            | (Kind::Boolean, Value::Boolean(_))
+            | (Kind::Table, Value::Table(_))
+            | (Kind::Array, Value::Array(_))
+            | (Kind::Datetime, Value::Datetime(_))
+    )
 }
 
-impl Kind {
-    /// The type named in a layout, if the name is one of the seven.
-    #[must_use]
-    pub fn named(name: &str) -> Option<Self> {
-        Some(match name {
-            "string" => Self::String,
-            "integer" => Self::Integer,
-            "float" => Self::Float,
-            "boolean" => Self::Boolean,
-            "table" => Self::Table,
-            "array" => Self::Array,
-            "datetime" => Self::Datetime,
-            _ => return None,
-        })
+/// The name a layout would use for `value`.
+#[must_use]
+pub const fn name_of(value: &Value) -> &'static str {
+    match value {
+        Value::String(_) => "string",
+        Value::Integer(_) => "integer",
+        Value::Float(_) => "float",
+        Value::Boolean(_) => "boolean",
+        Value::Table(_) => "table",
+        Value::Array(_) => "array",
+        Value::Datetime(_) => "datetime",
     }
-
-    /// Whether `value` is of this kind.
-    #[must_use]
-    pub const fn holds(self, value: &Value) -> bool {
-        matches!(
-            (self, value),
-            (Self::String, Value::String(_))
-                | (Self::Integer, Value::Integer(_))
-                | (Self::Float, Value::Float(_))
-                | (Self::Boolean, Value::Boolean(_))
-                | (Self::Table, Value::Table(_))
-                | (Self::Array, Value::Array(_))
-                | (Self::Datetime, Value::Datetime(_))
-        )
-    }
-
-    /// The name a layout would use for `value`.
-    #[must_use]
-    pub const fn of(value: &Value) -> &'static str {
-        match value {
-            Value::String(_) => "string",
-            Value::Integer(_) => "integer",
-            Value::Float(_) => "float",
-            Value::Boolean(_) => "boolean",
-            Value::Table(_) => "table",
-            Value::Array(_) => "array",
-            Value::Datetime(_) => "datetime",
-        }
-    }
-}
-
-/// One key the layout requires: its dotted path and its type.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Required {
-    pub path: String,
-    pub kind: Kind,
 }
 
 /// The keys a bound layout requires, in the order the layout names them.
@@ -93,11 +60,9 @@ impl Layout {
     /// The layout is not TOML, a leaf is not a type name, or a name is not
     /// one of the seven types.
     pub fn parse(text: &str) -> Result<Self, ContractError> {
-        let table: Table = text
-            .parse()
-            .map_err(|error: toml::de::Error| ContractError {
-                message: format!("the layout is not TOML: {}", error.message()),
-            })?;
+        let table: Table = text.parse().map_err(|error: toml::de::Error| {
+            ContractError::new(format!("the layout is not TOML: {}", error.message()))
+        })?;
         let mut required = Vec::new();
         collect(&table, "", &mut required)?;
         Ok(Self { required })
@@ -116,22 +81,10 @@ impl Layout {
         self.required
             .iter()
             .filter_map(|required| match lookup(document, &required.path) {
-                None => Some(ValidationIssue {
-                    code: "required".to_string(),
-                    message: format!("{} is required", required.path),
-                    path: Some(required.path.clone()),
-                }),
-                Some(value) if !required.kind.holds(value) => Some(ValidationIssue {
-                    code: "type".to_string(),
-                    message: format!(
-                        "{} is {}, the layout asks for {:?}",
-                        required.path,
-                        Kind::of(value),
-                        required.kind
-                    )
-                    .to_lowercase(),
-                    path: Some(required.path.clone()),
-                }),
+                None => Some(required.missing()),
+                Some(value) if !holds(required.kind, value) => {
+                    Some(required.mismatched(name_of(value)))
+                }
                 Some(_) => None,
             })
             .collect()
@@ -149,23 +102,9 @@ fn collect(table: &Table, prefix: &str, into: &mut Vec<Required>) -> Result<(), 
             Value::Table(nested) => collect(nested, &path, into)?,
             Value::String(name) => match Kind::named(name) {
                 Some(kind) => into.push(Required { path, kind }),
-                None => {
-                    return Err(ContractError {
-                        message: format!(
-                            "{path} asks for {name:?}; a layout type is string, integer, \
-                             float, boolean, table, array or datetime"
-                        ),
-                    });
-                }
+                None => return Err(Kind::unknown(&path, name)),
             },
-            other => {
-                return Err(ContractError {
-                    message: format!(
-                        "{path} is {}; a layout leaf names a type as a string",
-                        Kind::of(other)
-                    ),
-                });
-            }
+            other => return Err(Kind::not_a_name(&path, name_of(other))),
         }
     }
     Ok(())
@@ -247,5 +186,27 @@ name = \"string\"",
             .parse()
             .expect("toml");
         assert!(layout.check(&held).is_empty());
+    }
+
+    #[test]
+    fn every_toml_value_has_a_layout_name_and_holds_its_own_kind() {
+        let document: Table = "s = \"a\"\ni = 1\nf = 1.5\nb = true\nt = {}\na = []\n\
+                               d = 2026-09-10T08:00:00Z"
+            .parse()
+            .expect("toml");
+        for (key, name) in [
+            ("s", "string"),
+            ("i", "integer"),
+            ("f", "float"),
+            ("b", "boolean"),
+            ("t", "table"),
+            ("a", "array"),
+            ("d", "datetime"),
+        ] {
+            let value = &document[key];
+            assert_eq!(name_of(value), name);
+            assert!(holds(Kind::named(name).expect("kind"), value), "{name}");
+        }
+        assert!(!holds(Kind::String, &document["i"]));
     }
 }
