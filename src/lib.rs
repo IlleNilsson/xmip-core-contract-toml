@@ -94,10 +94,7 @@ impl Contract for Toml {
             .layout
             .as_ref()
             .map_or_else(Vec::new, |layout| layout.check(&document));
-        Ok(ValidationResult {
-            valid: issues.is_empty(),
-            issues,
-        })
+        Ok(ValidationResult::of(issues))
     }
 }
 
@@ -135,14 +132,11 @@ fn malformed(text: &str, error: &toml::de::Error) -> ValidationResult {
         let column = before.rsplit('\n').next().unwrap_or("").chars().count() + 1;
         format!("line {line} column {column}")
     });
-    ValidationResult {
-        valid: false,
-        issues: vec![ValidationIssue {
-            code: "malformed".to_string(),
-            message: format!("not valid TOML: {}", error.message()),
-            path,
-        }],
-    }
+    ValidationResult::of(vec![ValidationIssue::new(
+        "malformed",
+        &format!("not valid TOML: {}", error.message()),
+        path,
+    )])
 }
 
 /// Loads the contract a Location names: `toml` or an empty reference is the
@@ -176,15 +170,8 @@ impl ContractFactory for TomlFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use contract::fixture::stream_as as stream;
     use xcore::StreamId;
-
-    fn stream(text: &str, media_type: Option<&str>) -> Stream {
-        Stream::new(
-            StreamId::new(1),
-            text.as_bytes().to_vec(),
-            media_type.map(str::to_string),
-        )
-    }
 
     fn service_layout() -> Layout {
         Layout::parse("service.name = \"string\"\nservice.port = \"integer\"").expect("a layout")
