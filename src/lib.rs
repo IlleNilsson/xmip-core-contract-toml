@@ -13,11 +13,11 @@
 
 pub mod layout;
 
-use layout::Layout;
-use sdk::contract::{
+use contract::{
     Contract, ContractDescriptor, ContractError, ContractFactory, ContractId, ValidationIssue,
     ValidationResult,
 };
+use layout::Layout;
 use stream::Stream;
 use toml::Table;
 
