@@ -14,7 +14,7 @@
 //! capability's, shared with the YAML layout (ADR-0044); what is TOML's is
 //! whether a TOML value is of a kind, and what TOML calls a value.
 
-pub use contract::layout::{Kind, Required};
+use contract::layout::{Kind, Required};
 use contract::{ContractError, ValidationIssue};
 use toml::{Table, Value};
 

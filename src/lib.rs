@@ -80,11 +80,11 @@ impl Contract for Toml {
         if let Some(media_type) = stream.media_type() {
             return Ok(is_toml_media_type(media_type));
         }
-        Ok(std::str::from_utf8(stream.bytes()).is_ok_and(looks_like_toml))
+        Ok(stream.text().is_ok_and(looks_like_toml))
     }
 
     fn validate(&self, stream: &Stream) -> Result<ValidationResult, ContractError> {
-        let text = std::str::from_utf8(stream.bytes()).map_err(|error| ContractError {
+        let text = stream.text().map_err(|error| ContractError {
             message: format!("not UTF-8 text: {error}"),
         })?;
         let document = match text.parse::<Table>() {
@@ -135,7 +135,7 @@ fn malformed(text: &str, error: &toml::de::Error) -> ValidationResult {
     });
     ValidationResult::of(vec![ValidationIssue::new(
         "malformed",
-        &format!("not valid TOML: {}", error.message()),
+        format!("not valid TOML: {}", error.message()),
         path,
     )])
 }
@@ -242,7 +242,7 @@ mod tests {
         let codes: Vec<(&str, Option<&str>)> = departed
             .issues
             .iter()
-            .map(|issue| (issue.code.as_str(), issue.path.as_deref()))
+            .map(|issue| (issue.code.as_ref(), issue.path.as_deref()))
             .collect();
         assert_eq!(
             codes,
