@@ -20,6 +20,7 @@ use contract::{
 use layout::Layout;
 use stream::Stream;
 use toml::Table;
+use xcore::settings::{Applies, Kind, Presence, Setting, Settings};
 
 const REPRESENTATION: &str = "application/toml";
 
@@ -148,6 +149,10 @@ impl ContractFactory for TomlFactory {
         "toml"
     }
 
+    fn settings(&self) -> &'static Settings {
+        SETTINGS
+    }
+
     fn load(&self, reference: &str) -> Result<Box<dyn Contract>, ContractError> {
         let reference = reference.trim();
         if reference.is_empty() || reference == self.technology() {
@@ -166,6 +171,18 @@ impl ContractFactory for TomlFactory {
         Ok(Box::new(Toml::with_layout(name, layout)))
     }
 }
+
+/// What a Location gives this contract (ADR-0064, amendment 2026-09-26).
+const SETTINGS: &Settings = &Settings {
+    technology: env!("CARGO_PKG_NAME"),
+    settings: &[Setting {
+        name: "reference",
+        kind: Kind::Address,
+        presence: Presence::Optional,
+        meaning: "The path of the layout documents are held to; left out, any TOML holds.",
+        applies: Applies::Both,
+    }],
+};
 
 #[cfg(test)]
 mod tests {
@@ -301,5 +318,38 @@ mod tests {
         let bound = Toml::with_layout("edge", layout);
         let held = bound.validate(&stream(&text, None)).expect("validates");
         assert!(held.valid, "{:?}", held.issues);
+    }
+
+    #[test]
+    fn toml_declares_its_settings_and_reads_through_them() {
+        assert!(SETTINGS.problems().is_empty(), "{:?}", SETTINGS.problems());
+        let given = |name: &str, value: &str| {
+            (
+                name.to_string(),
+                xcore::settings::Given::Text(value.to_string()),
+            )
+        };
+        assert!(TomlFactory.open(Applies::Both, &[]).is_ok(), "bare");
+        let unread = TomlFactory
+            .open(
+                Applies::Receive,
+                &[given("reference", "/no/such/service.toml")],
+            )
+            .err()
+            .expect("an unread file is refused");
+        assert!(
+            unread.message.contains("/no/such/service.toml"),
+            "{}",
+            unread.message
+        );
+        let refused = TomlFactory
+            .open(Applies::Send, &[given("unheard_of", "x")])
+            .err()
+            .expect("an unknown setting is refused");
+        assert!(
+            refused.message.contains("unheard_of"),
+            "{}",
+            refused.message
+        );
     }
 }
