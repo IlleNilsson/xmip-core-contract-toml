@@ -298,9 +298,9 @@ mod tests {
     }
 
     #[test]
-    fn the_edge_node_sample_is_well_formed_and_holds_its_service_layout() {
+    fn the_cluster_sample_is_well_formed_and_holds_its_service_layout() {
         let sample = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../operation/gui/samples/edge-01.xmip.toml");
+            .join("../../../operation/gui/samples/xmip.toml");
         let Ok(text) = std::fs::read_to_string(&sample) else {
             eprintln!("sample {} is absent; skipped", sample.display());
             return;
@@ -315,7 +315,7 @@ mod tests {
              modules = \"array\"\nreceive_locations = \"array\"",
         )
         .expect("a layout");
-        let bound = Toml::with_layout("edge", layout);
+        let bound = Toml::with_layout("lab", layout);
         let held = bound.validate(&stream(&text, None)).expect("validates");
         assert!(held.valid, "{:?}", held.issues);
     }
