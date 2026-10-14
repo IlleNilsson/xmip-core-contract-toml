@@ -185,7 +185,7 @@ name = \"string\"",
         let held: Table = "started = 2026-09-10T08:00:00Z\n[service]\nname = \"a\"\nport = 1"
             .parse()
             .expect("toml");
-        assert!(layout.check(&held).is_empty());
+        assert_eq!(layout.check(&held), [] as [ValidationIssue; 0]);
     }
 
     #[test]
