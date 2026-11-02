@@ -24,7 +24,7 @@ stream = { package = "xmip-core-stream", git = "https://github.com/IlleNilsson/x
 
 # The one real parser. Well-formedness is a genuine parse, and every error
 # carries the span the line and column are taken from.
-toml = "0.9"
+toml = "1"
 
 [dev-dependencies]
 # The parent's Stream fixture, for the tests only (ADR-0044).
