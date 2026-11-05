@@ -279,11 +279,11 @@ mod tests {
         );
         let dir = std::env::temp_dir().join("xmip-contract-toml-test");
         std::fs::create_dir_all(&dir).expect("temp dir");
-        let file = dir.join("service.layout.toml");
+        let file = dir.join("service.layout.xmip");
         std::fs::write(&file, "service.name = \"string\"").expect("write layout");
         let bound = factory.load(file.to_str().expect("path")).expect("bound");
         assert_eq!(bound.descriptor().id.0, "toml:service.layout");
-        let bad = dir.join("bad.layout.toml");
+        let bad = dir.join("bad.layout.xmip");
         std::fs::write(&bad, "service.name = \"text\"").expect("write layout");
         let refused = factory
             .load(bad.to_str().expect("path"))
@@ -292,7 +292,7 @@ mod tests {
         assert!(refused.message.contains("service.name asks for \"text\""));
         assert!(
             factory
-                .load(dir.join("missing.toml").to_str().expect("path"))
+                .load(dir.join("missing.xmip").to_str().expect("path"))
                 .is_err()
         );
     }
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn the_cluster_sample_is_well_formed_and_holds_its_service_layout() {
         let sample = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../operation/gui/samples/xmip.toml");
+            .join("../../../operation/gui/samples/cluster.xmip");
         let Ok(text) = std::fs::read_to_string(&sample) else {
             eprintln!("sample {} is absent; skipped", sample.display());
             return;
@@ -333,12 +333,12 @@ mod tests {
         let unread = TomlFactory
             .open(
                 Applies::Receive,
-                &[given("reference", "/no/such/service.toml")],
+                &[given("reference", "/no/such/service.xmip")],
             )
             .err()
             .expect("an unread file is refused");
         assert!(
-            unread.message.contains("/no/such/service.toml"),
+            unread.message.contains("/no/such/service.xmip"),
             "{}",
             unread.message
         );
