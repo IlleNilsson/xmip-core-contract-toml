@@ -80,11 +80,11 @@ impl Contract for Toml {
         if let Some(media_type) = stream.media_type() {
             return Ok(is_toml_media_type(media_type));
         }
-        Ok(stream.text().is_ok_and(looks_like_toml))
+        Ok(contract::text(stream)?.is_ok_and(looks_like_toml))
     }
 
     fn validate(&self, stream: &Stream) -> Result<ValidationResult, ContractError> {
-        let text = stream.text().map_err(|error| ContractError {
+        let text = contract::text(stream)?.map_err(|error| ContractError {
             message: format!("not UTF-8 text: {error}"),
         })?;
         let document = match text.parse::<Table>() {
