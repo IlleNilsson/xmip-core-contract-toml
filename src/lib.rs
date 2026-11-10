@@ -279,11 +279,11 @@ mod tests {
         );
         let dir = std::env::temp_dir().join("xmip-contract-toml-test");
         std::fs::create_dir_all(&dir).expect("temp dir");
-        let file = dir.join("service.layout.xmip");
+        let file = dir.join("service.layout.toml");
         std::fs::write(&file, "service.name = \"string\"").expect("write layout");
         let bound = factory.load(file.to_str().expect("path")).expect("bound");
         assert_eq!(bound.descriptor().id.0, "toml:service.layout");
-        let bad = dir.join("bad.layout.xmip");
+        let bad = dir.join("bad.layout.toml");
         std::fs::write(&bad, "service.name = \"text\"").expect("write layout");
         let refused = factory
             .load(bad.to_str().expect("path"))
@@ -292,7 +292,7 @@ mod tests {
         assert!(refused.message.contains("service.name asks for \"text\""));
         assert!(
             factory
-                .load(dir.join("missing.xmip").to_str().expect("path"))
+                .load(dir.join("missing.toml").to_str().expect("path"))
                 .is_err()
         );
     }
@@ -333,12 +333,12 @@ mod tests {
         let unread = TomlFactory
             .open(
                 Applies::Receive,
-                &[given("reference", "/no/such/service.xmip")],
+                &[given("reference", "/no/such/service.toml")],
             )
             .err()
             .expect("an unread file is refused");
         assert!(
-            unread.message.contains("/no/such/service.xmip"),
+            unread.message.contains("/no/such/service.toml"),
             "{}",
             unread.message
         );
