@@ -277,8 +277,7 @@ mod tests {
             factory.load("toml").expect("bare").descriptor().id.0,
             "toml"
         );
-        let dir = std::env::temp_dir().join("xmip-contract-toml-test");
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let dir = file::temporary::Folder::new("contract-toml");
         let file = dir.join("service.layout.toml");
         std::fs::write(&file, "service.name = \"string\"").expect("write layout");
         let bound = factory.load(file.to_str().expect("path")).expect("bound");
