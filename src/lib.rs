@@ -10,26 +10,44 @@
 //!
 //! The layout language is the small TOML document [`layout`] documents: a
 //! required key per leaf, its type as the value, nested by dotted path.
+//!
+//! **Built with its `declaration` feature alone** the crate is
+//! [`declaration`], what a Location naming it is configured with and the
+//! name a Validate step names it by, and none of the code above, which is
+//! behind the default feature: what the surfaces' library carries (ADR-0064,
+//! amendment 2026-11-26).
 
+#[cfg(feature = "declaration")]
+pub mod declaration;
+
+#[cfg(feature = "default")]
 pub mod layout;
 
+#[cfg(feature = "default")]
 use contract::{
     Contract, ContractDescriptor, ContractError, ContractFactory, ContractId, ValidationIssue,
     ValidationResult,
 };
+#[cfg(feature = "default")]
 use layout::Layout;
+#[cfg(feature = "default")]
 use stream::Stream;
+#[cfg(feature = "default")]
 use toml::Table;
-use xcore::settings::{Applies, Kind, Presence, Setting, Settings};
+#[cfg(feature = "default")]
+use xcore::settings::Settings;
 
+#[cfg(feature = "default")]
 const REPRESENTATION: &str = "application/toml";
 
 /// The TOML contract, bare or bound to a layout.
+#[cfg(feature = "default")]
 pub struct Toml {
     descriptor: ContractDescriptor,
     layout: Option<Layout>,
 }
 
+#[cfg(feature = "default")]
 impl Toml {
     /// Well-formedness only.
     #[must_use]
@@ -57,12 +75,14 @@ impl Toml {
     }
 }
 
+#[cfg(feature = "default")]
 impl Default for Toml {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(feature = "default")]
 fn descriptor(id: &str) -> ContractDescriptor {
     ContractDescriptor {
         id: ContractId(id.to_string()),
@@ -71,6 +91,7 @@ fn descriptor(id: &str) -> ContractDescriptor {
     }
 }
 
+#[cfg(feature = "default")]
 impl Contract for Toml {
     fn descriptor(&self) -> &ContractDescriptor {
         &self.descriptor
@@ -99,6 +120,7 @@ impl Contract for Toml {
     }
 }
 
+#[cfg(feature = "default")]
 fn is_toml_media_type(media_type: &str) -> bool {
     let essence = media_type.split(';').next().unwrap_or("").trim();
     essence.eq_ignore_ascii_case("application/toml") || essence.ends_with("+toml")
@@ -106,6 +128,7 @@ fn is_toml_media_type(media_type: &str) -> bool {
 
 /// The first line that is neither blank nor a comment is a table header or a
 /// `key = value` with a TOML-shaped key.
+#[cfg(feature = "default")]
 fn looks_like_toml(text: &str) -> bool {
     let Some(line) = text
         .lines()
@@ -126,6 +149,7 @@ fn looks_like_toml(text: &str) -> bool {
     })
 }
 
+#[cfg(feature = "default")]
 fn malformed(text: &str, error: &toml::de::Error) -> ValidationResult {
     let path = error.span().map(|span| {
         let before = &text[..span.start.min(text.len())];
@@ -142,15 +166,17 @@ fn malformed(text: &str, error: &toml::de::Error) -> ValidationResult {
 
 /// Loads the contract a Location names: `toml` or an empty reference is the
 /// bare contract, anything else is the path of a layout file.
+#[cfg(feature = "default")]
 pub struct TomlFactory;
 
+#[cfg(feature = "default")]
 impl ContractFactory for TomlFactory {
     fn technology(&self) -> &'static str {
-        "toml"
+        declaration::NAME
     }
 
     fn settings(&self) -> &'static Settings {
-        SETTINGS
+        declaration::SETTINGS
     }
 
     fn load(&self, reference: &str) -> Result<Box<dyn Contract>, ContractError> {
@@ -171,18 +197,6 @@ impl ContractFactory for TomlFactory {
         Ok(Box::new(Toml::with_layout(name, layout)))
     }
 }
-
-/// What a Location gives this contract (ADR-0064, amendment 2026-09-26).
-const SETTINGS: &Settings = &Settings {
-    technology: env!("CARGO_PKG_NAME"),
-    settings: &[Setting {
-        name: "reference",
-        kind: Kind::Address,
-        presence: Presence::Optional,
-        meaning: "The path of the layout documents are held to; left out, any TOML holds.",
-        applies: Applies::Both,
-    }],
-};
 
 #[cfg(test)]
 mod tests {
@@ -321,6 +335,8 @@ mod tests {
 
     #[test]
     fn toml_declares_its_settings_and_reads_through_them() {
+        use declaration::SETTINGS;
+        use xcore::settings::Applies;
         assert!(SETTINGS.problems().is_empty(), "{:?}", SETTINGS.problems());
         let given = |name: &str, value: &str| {
             (
